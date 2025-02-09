@@ -8,8 +8,13 @@ import { fileURLToPath } from 'url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-import pdf from 'pdfjs-dist/legacy/build/pdf.js';
-const { getDocument } = pdf;
+//import pdf from 'pdfjs-dist/legacy/build/pdf.js';
+//const { getDocument } = pdf;
+
+// require to isntall: npm install pdfjs-dist@2.16.105
+import pdfjsLib from 'pdfjs-dist/legacy/build/pdf.js';
+pdfjsLib.GlobalWorkerOptions.workerSrc = path.join(__dirname, 'node_modules/pdfjs-dist/legacy/build/pdf.worker.js');
+const { getDocument } = pdfjsLib;
 
 async function extractSearchableText(pdf) {
     const textContent = [];
@@ -59,7 +64,7 @@ async function processDirectory(dirPath, language = 'eng') {
         ]
     });
 
-    const tesseractWorker = await createWorker(language);
+    const tesseractWorker = await createWorker('eng+heb');
     
 
     try {

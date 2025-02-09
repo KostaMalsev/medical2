@@ -1,0 +1,7 @@
+*.json
+*.gguf
+*.traineddata
+node_modules/
+models/
+hebrew-medical-ner/
+hebrew-medical-ner-final/

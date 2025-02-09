@@ -10,7 +10,6 @@ import pandas as pd
 from datetime import datetime
 from tabulate import tabulate
 import traceback
-from preprocess_text import HebrewMedicalPreprocessor,prepare_text_for_model
 
 from nemo_parser import validate_documents
 
@@ -223,62 +222,6 @@ def extract_ner_entities(text) -> Dict[str, str]:
     return validate_documents(text=text)
     
 
-
-def debug_model_outputs(text: str, tokenizer, model) -> tuple[torch.Tensor, torch.Tensor]:
-    """
-    Debug and analyze model outputs with simple CSV output.
-    """
-    # Tokenize input
-
-    preprocessor = HebrewMedicalPreprocessor()
-    tokenizer = AutoTokenizer.from_pretrained("hebrew-medical-ner-final")
-
-    # Process text
-    inputs, offset_mapping = prepare_text_for_model(text, tokenizer)
-
-    '''
-    inputs = tokenizer(
-        text,
-        return_tensors="pt",
-        padding=True,
-        truncation=True,
-        max_length=512
-    )
-    '''
-    
-    # Get model outputs
-    outputs = model(**inputs)
-    logits = outputs.logits[0]
-    
-    # Get predictions and probabilities
-    predictions = torch.argmax(logits, dim=1)
-    probabilities = torch.softmax(logits, dim=1)
-    
-    # Process tokens and write to file
-    file = open('validation.csv', 'w')
-    file.write('Token, Label, Predictions, TopResults\n')
-    
-    tokens = tokenizer.convert_ids_to_tokens(inputs['input_ids'][0])
-    
-    for i, (token, pred) in enumerate(zip(tokens, predictions)):
-        pred_idx = pred.item()
-        pred_label = model.config.id2label[pred_idx]
-        confidence = probabilities[i, pred_idx].item()
-        
-        # Get top 3 predictions
-        top_probs, top_indices = torch.topk(probabilities[i], k=3)
-        top_labels = [model.config.id2label[idx.item()] for idx in top_indices]
-        top_probs = [prob.item() for prob in top_probs]
-        
-        # Format output line
-        top_results = ''
-        for label, prob in zip(top_labels, top_probs):
-            top_results += f"  {label}: {prob:.4f}"
-            
-        file.write(f"{token},{pred_label},{confidence:.4f},{top_results}\n")
-    
-    file.close()
-    return predictions, probabilities
 
 def extract_entities(text: str, parameters: List[FieldOption]) -> Dict[str, str]:
     

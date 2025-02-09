@@ -217,8 +217,6 @@ def validate_fields(entities: Dict[str, str], text: str) -> Dict[str, str]:
 #def extract_ner_entities(tokens: List[str], labels: List[str], parameters: List[FieldOption]) -> Dict[str, str]:
 def extract_ner_entities(text) -> Dict[str, str]:
 
-    entities = {}
-
     return validate_documents(text=text)
     
 
@@ -237,25 +235,6 @@ def extract_entities(text: str, parameters: List[FieldOption]) -> Dict[str, str]
     entities.update(additional_info)
 
     # NER Processing
-    inputs = tokenizer(text, return_tensors="pt", padding=True, truncation=True)
-    outputs = model(**inputs)
-    predictions = torch.argmax(outputs.logits, dim=2)
-    
-    tokens = tokenizer.convert_ids_to_tokens(inputs["input_ids"][0])
-    labels = [model.config.id2label[t.item()] for t in predictions[0]]
-    
-    # Debug model outputs
-    predictions, probabilities = debug_model_outputs(text, tokenizer, model)
-    debug_info = {
-            'tokens': tokens,
-            'labels': labels,
-            'model_predictions': predictions.tolist(),
-            'probability_distribution': probabilities.tolist()[:10]  # First 10 probabilities for first token
-        }
-    #print("Debug Info:")
-    #print(debug_info)
-
-    #ner_entities = extract_ner_entities(tokens, labels, parameters)
     ner_entities = extract_ner_entities(text)
 
     entities.update(ner_entities)

@@ -14,9 +14,6 @@ import traceback
 from nemo_parser import validate_documents
 
 
-
-
-
 app = FastAPI()
 
 

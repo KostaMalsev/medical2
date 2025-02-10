@@ -4,14 +4,11 @@ import { createCanvas } from 'canvas';
 import { createWorker } from 'tesseract.js';
 import { createObjectCsvWriter as createCsvWriter } from 'csv-writer';
 import { fileURLToPath } from 'url';
+import TextSanitizer from './text-sanitizer.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-//import pdf from 'pdfjs-dist/legacy/build/pdf.js';
-//const { getDocument } = pdf;
-
-// require to isntall: npm install pdfjs-dist@2.16.105
 import pdfjsLib from 'pdfjs-dist/legacy/build/pdf.js';
 pdfjsLib.GlobalWorkerOptions.workerSrc = path.join(__dirname, 'node_modules/pdfjs-dist/legacy/build/pdf.worker.js');
 const { getDocument } = pdfjsLib;
@@ -42,6 +39,14 @@ async function convertToImage(page) {
     return canvas.toBuffer('image/png');
 }
 
+async function writeToCSV(writer, records, filename, sanitizer) {
+    const sanitizedRecords = records.map(record => ({
+        filename,
+        ...sanitizer.sanitizeDocument(record)
+    }));
+    await writer.writeRecords(sanitizedRecords);
+}
+
 async function processDirectory(dirPath, language = 'eng') {
     const resultsDir = 'results';
     await fs.mkdir(resultsDir, { recursive: true });
@@ -65,7 +70,7 @@ async function processDirectory(dirPath, language = 'eng') {
     });
 
     const tesseractWorker = await createWorker('eng+heb');
-    
+    const sanitizer = new TextSanitizer();
 
     try {
         const files = (await fs.readdir(dirPath))
@@ -84,29 +89,25 @@ async function processDirectory(dirPath, language = 'eng') {
                 useSystemFonts: true
             }).promise;
 
+            // Extract searchable text
             const searchableContent = await extractSearchableText(pdf);
             
-            await searchableWriter.writeRecords(
-                searchableContent.map(item => ({
-                    filename: file,
-                    ...item
-                }))
-            );
-            
-            // Extracting OCR text for each page of the PDF document
-            // This process involves converting each page to an image and then using Tesseract.js for OCR
+            // Process OCR text
+            const ocrContent = [];
             for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
                 const page = await pdf.getPage(pageNum);
                 const image = await convertToImage(page);
-                
                 const { data: { text } } = await tesseractWorker.recognize(image);
                 
-                await ocrWriter.writeRecords([{
-                    filename: file,
+                ocrContent.push({
                     pageNumber: pageNum,
                     text: text.trim()
-                }]);
+                });
             }
+
+            // Write sanitized content to CSV files
+            await writeToCSV(searchableWriter, searchableContent, file, sanitizer);
+            await writeToCSV(ocrWriter, ocrContent, file, sanitizer);
             
             console.log(`Completed processing ${file}`);
         }

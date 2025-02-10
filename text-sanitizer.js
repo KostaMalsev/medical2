@@ -1,50 +1,144 @@
 // text-sanitizer.js
+const fs = require('fs');
+const path = require('path');
 
-// Common medical terms and measurements that should not be sanitized
-const MEDICAL_TERMS = new Set([
+// Expanded medical terms and common words that should not be sanitized
+const PRESERVED_TERMS = new Set([
+    // Medical conditions and tests
     'CVA', 'FIM', 'MMSE', 'COPD', 'Diabetes', 'Mellitus',
+    
+    // Common medical terms in Hebrew
     'עצמאי', 'בקבלה', 'בשחרור', 'אבחנות', 'פיזיותרפיה',
-    'משקל', 'מטר', 'בציוני', 'אבח', 'יום', 'בברכה'
+    'משקל', 'מטר', 'בציוני', 'אבח', 'יום', 'בברכה',
+    
+    // Medical document terms
+    'מחלקת', 'שיקום', 'מכתב', 'שחרור', 'תאריך', 'קבלה',
+    'תיק', 'רפואי', 'לידה', 'עיקריות', 'איסכמי', 'המיספרה',
+    'שמאלית', 'לחץ', 'דם', 'סוכרת', 'מסוג', 'הערכת',
+    'מוטורי', 'טיפול', 'עצמי', 'רחצה', 'הלבשה', 'גוף',
+    'עליון', 'תחתון', 'בסוגרים', 'שתן', 'צואה',
+    
+    // Medical activities and measurements
+    'העברות', 'מיטה', 'כסא', 'שירותים', 'אמבטיה', 'מקלחת',
+    'ניידות', 'מדרגות', 'קוגניטיבי', 'הבנה', 'הבעה',
+    'אינטראקציה', 'חברתית', 'פתרון', 'בעיות', 'זיכרון',
+    
+    // Common words and phrases
+    'החולים', 'הכללי', 'בית', 'מספר', 'סיכום', 'מהלך',
+    'האשפוז', 'המטופל', 'התקבל', 'למחלקת', 'לאחר', 'אירוע',
+    'מוחי', 'בקבלתו', 'סבל', 'מחולשה', 'בפלג', 'קשיים',
+    'בדיבור', 'והפרעה', 'בשיווי', 'במהלך', 'עבר', 'שיקומי',
+    'אינטנסיבי', 'הכולל', 'ריפוי', 'בעיסוק', 'קלינאות',
+    'תקשורת', 'מסוגל', 'כעת', 'לבצע', 'חל', 'שיפור',
+    'משמעותי', 'בתפקוד', 'המוטורי', 'והקוגניטיבי', 'כפי',
+    'שמשתקף', 'מרבית', 'פעולות', 'היומיום', 'באופן',
+    'בעזרה', 'מינימלית', 'הליכה', 'מתבצעת', 'בעזרת',
+    'הליכון', 'לטווח', 'המלצות', 'המשך', 'במסגרת', 'מעקב',
+    'משפחה', 'תרופתי', 'פעם', 'פעמיים', 'בשבוע'
 ]);
 
 class TextSanitizer {
-    constructor() {
-        this.nameMap = new Map();
-        this.nameCounter = 1;
+    constructor(namesFilePath = 'hebrew_names.csv') {
+        this.idCounter = 1;
+        this.namesSet = new Set();
+        
+        // Load names from CSV
+        try {
+            const namesList = fs.readFileSync(namesFilePath, 'utf8')
+                              .split('\n')
+                              .map(name => name.trim())
+                              .filter(name => name.length > 0);
+            this.namesSet = new Set(namesList);
+            console.log(`Loaded ${this.namesSet.size} names from ${namesFilePath}`);
+        } catch (error) {
+            console.error(`Error loading names from ${namesFilePath}:`, error.message);
+        }
         
         this.patterns = {
-            // ID patterns
             ID_NUMBER: /(?:ת\.?ז\.?|מספר\s*זהות\s*:?\s*)(\d{9})/g,
             STANDALONE_ID: /(?<!\d)\d{9}(?!\d|\s*\/)/g,
-            
-            // Name pattern
-            NAME: /(ישראלי\s*ישראלי|(?:ד"ר|פרופ'|דר'|מר|גב'|בן|בת)\s+[א-ת]+(?:\s+[א-ת]+){0,2}|[א-ת]+\s+(?:כהן|לוי|ישראלי))/g,
-            
-            // File path pattern
-            FILE_PATH: /(?:file:\/\/\/[^\s]*|discharge-letter\.html|\d+\/\d+\s*$)/g
+            NAME_PREFIX: /(?:ד"ר|פרופ'|דר'|מר|גב'|בן|בת)\s+/,
+            FILE_PATH: /(?:file:\/\/\/[^\s]*|discharge-letter\.html|\d+\/\d+\s*$)/g,
+            EXTRA_SPACES: /(?<=[א-ת])\s+(?=[א-ת])/g,
+            MULTIPLE_SPACES: /\s{2,}/g
         };
     }
 
     reset() {
-        this.nameMap.clear();
-        this.nameCounter = 1;
+        this.idCounter = 1;
     }
 
-    generateUniqueName() {
-        return `PERSON_${String(this.nameCounter++).padStart(3, '0')}`;
+    generateUniqueId() {
+        return `ID_${String(this.idCounter++).padStart(6, '0')}`;
+    }
+
+    generateRedactedName() {
+        return '"ףף"';
     }
 
     shouldPreserveToken(token) {
-        if (MEDICAL_TERMS.has(token.trim())) {
+        const cleanToken = token.trim();
+        
+        if (PRESERVED_TERMS.has(cleanToken)) {
             return true;
         }
         
-        // Preserve measurements and dates
-        if (/^(?:\d+(?:\/\d+)?(?:\s*(?:מ"ג|מ״ג|ק"ג|ק״ג))?|\d{1,2}[\/\.]\d{1,2}[\/\.]\d{2,4})$/.test(token)) {
+        if (/^(?:\d+(?:\/\d+)?(?:\s*(?:מ"ג|מ״ג|ק"ג|ק״ג))?|\d{1,2}[\/\.]\d{1,2}[\/\.]\d{2,4})$/.test(cleanToken)) {
+            return true;
+        }
+
+        if (/^[א-ת]{1,2}$/.test(cleanToken)) {
             return true;
         }
 
         return false;
+    }
+
+    isName(word) {
+        if (word.length < 2) return false;
+        
+        const cleanWord = word.replace(this.patterns.NAME_PREFIX, '').trim();
+        
+        return this.namesSet.has(cleanWord) || 
+               /(?:ישראלי|כהן|לוי)$/.test(cleanWord);
+    }
+
+    normalizeSpaces(text) {
+        // Join incorrectly split Hebrew words
+        let words = text.split(/\s+/);
+        let result = [];
+        let currentWord = '';
+        
+        for (let i = 0; i < words.length; i++) {
+            let word = words[i];
+            
+            // Handle Hebrew characters
+            if (/^[א-ת]$/.test(word) && currentWord !== '') {
+                currentWord += word;
+            }
+            // Handle multi-character Hebrew words
+            else if (/^[א-ת]{2,}$/.test(word)) {
+                if (currentWord !== '') {
+                    result.push(currentWord);
+                }
+                currentWord = word;
+            }
+            // Handle non-Hebrew or mixed content
+            else {
+                if (currentWord !== '') {
+                    result.push(currentWord);
+                    currentWord = '';
+                }
+                result.push(word);
+            }
+        }
+        
+        // Add any remaining word
+        if (currentWord !== '') {
+            result.push(currentWord);
+        }
+        
+        return result.join(' ');
     }
 
     sanitizeText(text) {
@@ -52,38 +146,53 @@ class TextSanitizer {
             return text;
         }
 
-        // Remove file paths
+        // Remove file paths first
         text = text.replace(this.patterns.FILE_PATH, '');
 
-        // Replace ID numbers
-        text = text.replace(this.patterns.ID_NUMBER, 'ת.ז.: ID_REDACTED');
-        text = text.replace(this.patterns.STANDALONE_ID, 'ID_REDACTED');
+        // Replace IDs with unique IDs
+        text = text.replace(this.patterns.ID_NUMBER, (match) => {
+            const uniqueId = this.generateUniqueId();
+            return `ת.ז.: ${uniqueId}`;
+        });
+        text = text.replace(this.patterns.STANDALONE_ID, () => this.generateUniqueId());
 
-        // Split text by existing spaces and process each token
+        // Normalize spaces and split into words
+        text = this.normalizeSpaces(text);
         const words = text.split(/\s+/);
-        const sanitizedWords = words.map(word => {
-            // Skip empty words
-            if (!word) return word;
+        let sanitizedWords = [];
+        
+        for (let i = 0; i < words.length; i++) {
+            let word = words[i];
+            
+            if (!word) continue;
 
-            // Skip words that should be preserved
+            // Preserve medical terms and common words
             if (this.shouldPreserveToken(word)) {
-                return word;
+                sanitizedWords.push(word);
+                continue;
             }
 
             // Handle names
-            const nameMatch = word.match(this.patterns.NAME);
-            if (nameMatch) {
-                if (!this.nameMap.has(nameMatch[0])) {
-                    this.nameMap.set(nameMatch[0], this.generateUniqueName());
+            if (this.isName(word)) {
+                let fullName = word;
+                let j = i + 1;
+                while (j < words.length && this.isName(words[j])) {
+                    fullName += ' ' + words[j];
+                    j++;
                 }
-                return this.nameMap.get(nameMatch[0]);
+                
+                sanitizedWords.push(this.generateRedactedName());
+                i = j - 1;
+                continue;
             }
 
-            return word;
-        });
+            sanitizedWords.push(word);
+        }
 
-        // Join words back together with original spacing
-        return sanitizedWords.join(' ');
+        // Join words and clean up spacing
+        return sanitizedWords.join(' ')
+            .replace(this.patterns.MULTIPLE_SPACES, ' ')
+            .trim();
     }
 
     sanitizeDocument(document) {

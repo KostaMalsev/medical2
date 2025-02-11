@@ -66,37 +66,67 @@ function createEmptyRecord(parameters) {
 async function processPatientData(inputDir = 'results') {
     try {
         const parameters = await loadParameters();
-        const searchResults = fs.readFileSync(path.join(inputDir, 'searchable_text.csv'), 'utf8');
+        
+        // Read the CSV file
+        const searchResults = fs.readFileSync(
+            //path.join(inputDir, 'searchable_text.csv'), 
+            path.join(inputDir, 'ocr_text.csv'), 
+            'utf8'
+        );
+        
+        // Parse CSV
         const results = Papa.parse(searchResults, {
             header: true,
             skipEmptyLines: true
         }).data;
+
+        // Group by Filename (capital F) using lodash
+        const patientGroups = _.groupBy(results, 'Filename');
         
-        const patientGroups = _.groupBy(results, 'filename');
-        
+        console.log('Processing files:', Object.keys(patientGroups).length);
+
+        // Process each patient's data
         const patientData = await Promise.all(
             Object.entries(patientGroups).map(async ([filename, pages]) => {
-                const fullText = pages.map(page => page['Text Content']).join(' ');
-                const res = await analyzeMedicalTextWithNER(fullText, parameters);
-                console.table(res)
-                return res;
+                // Combine text from all pages
+                const fullText = pages[0]['Text Content'] 
+                    ? pages.map(page => page['Text Content']).join(' ')
+                    : pages.map(page => page['OCR Text']).join(' ');
+
+                // Clean up any file path artifacts in the filename
+                const cleanFilename = path.basename(filename);
+
+                // Analyze text
+                const analysis = await analyzeMedicalTextWithNER(fullText, parameters);
+                console.table(analysis)
+                return {
+                    filename: cleanFilename,
+                    ...analysis
+                };
             })
         );
-        
+
+        // Export results
         const csv = Papa.unparse(patientData);
         fs.writeFileSync('patient_data.csv', csv);
-        
-        console.log(`Processed ${patientData.length} patient records`);
+
+        console.log(`Successfully processed ${patientData.length} patient records`);
         return patientData;
+
     } catch (error) {
-        console.error('Error:', error.message);
-        process.exit(1);
+        console.error('Error processing patient data:', error);
+        throw error;
     }
 }
 
+// Add command line support
 if (require.main === module) {
     const inputDir = process.argv[2] || 'results';
-    processPatientData(inputDir);
+    processPatientData(inputDir)
+        .catch(error => {
+            console.error('Processing failed:', error);
+            process.exit(1);
+        });
 }
 
 module.exports = processPatientData;

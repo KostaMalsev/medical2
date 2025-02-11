@@ -47,13 +47,13 @@ FIELD_PATTERNS = {
     #'physical_examination': r'(?:בדיקה\s*גופנית|בדיקה\s*בקבלה):?\s*([^\.]+)',
     #'diagnoses': r'(?:אבחנות\s*(?:עיקריות)?:?\s*|[\.\d]+\s*)([^\.]+)',
     'admission_reason': r'(?:סיבת\s*(?:קבלה|אשפוז|הפניה)|התקבל\s*עקב):?\s*([^\.]+)',
-    'admission_source': r'(?:התקבל|הגיע)\s*מ:?\s*([^\.]+)',
+    #'admission_source': r'(?:התקבל|הגיע)\s*מ:?\s*([^\.]+)',
     #'medications_type': r'(?:תרופות|טיפול\s*תרופתי):?\s*([^\.]+)',
     'allergies': r'אלרגיות:?\s*([^\.]+)',
-    'tests': r'(?:בדיקות|בדיקה):?\s*([^\.]+)',
+    #'tests': r'(?:בדיקות|בדיקה):?\s*([^\.]+)',
     'rehabilitation_type': r'סוג\s*שיקום:?\s*([^\.]+)',
     'past_procedures': r'(?:פרוצדורות|טיפולים)\s*(?:בעבר|קודמים):?\s*([^\.]+)',
-    'residence_type': r'(?:סוג\s*(?:מגורים|דיור)|מקום\s*מגורים):?\s*([^\.]+)',
+    #'residence_type': r'(?:סוג\s*(?:מגורים|דיור)|מקום\s*מגורים):?\s*([^\.]+)',
     'stairs_count': r'מדרגות:?\s*([\d]+)',
     'general_appearance': r'מראה\s*כללי:?\s*([^\.]+)',
     'assistive_devices': r'(?:אביזרי|עזרי)\s*עזר:?\s*([^\.]+)',
@@ -66,18 +66,18 @@ FIELD_PATTERNS = {
     'covid_vaccine': r'חיסון\s*קורונה:?\s*([^\.]+)',
     'previous_functioning': r'תפקוד\s*קודם:?\s*([^\.]+)',
     'outdoor_mobility': r'ניידות\s*(?:בחוץ|מחוץ\s*לבית):?\s*([^\.]+)',
-    'aid_law': r'(?:חוק\s*סיעוד|גמלת\s*סיעוד):?\s*([^\.]+)',
+    #'aid_law': r'(?:חוק\s*סיעוד|גמלת\s*סיעוד):?\s*([^\.]+)',
     'cognitive_assessment': r'הערכה\s*קוגניטיבית:?\s*([^\.]+)',
     'consciousness': r'(?:הכרה|מצב\s*הכרה):?\s*([^\.]+)',
     'sensation': r'תחושה:?\s*([^\.]+)',
     'gross_strength': r'כוח\s*גס:?\s*([^\.]+)',
     'ecg': r'(?:א\.?ק\.?ג|EKG|ECG):?\s*([^\.]+)',
-    'nursing_care_claim': r'(?:תביעת\s*סיעוד|תביעה\s*לגמלת\s*סיעוד):?\s*([^\.]+)',
+    #'nursing_care_claim': r'(?:תביעת\s*סיעוד|תביעה\s*לגמלת\s*סיעוד):?\s*([^\.]+)',
     #'language_communication': r'(?:תקשורת|שפה|הבעה):?\s*([^\.]+)',
     'mood': r'מצב\s*רוח:?\s*([^\.]+)',
     'appetite': r'תיאבון:?\s*([^\.]+)',
     'anxiety': r'חרדה:?\s*([^\.]+)',
-    'hospitalization_extension': r'הארכת\s*אשפוז:?\s*([^\.]+)'
+    #'hospitalization_extension': r'הארכת\s*אשפוז:?\s*([^\.]+)'
 }
 
 
@@ -152,7 +152,10 @@ def match_pattern(text: str) -> Dict[str, str]:
             if field in ['admission_date', 'discharge_date']:
                 additional_info[field] = normalize_date(match.group(1).strip())
             else:
+                if not match.groups():
+                    continue
                 additional_info[field] = match.group(1).strip()
+
     return additional_info
 
 
@@ -257,8 +260,8 @@ def print_entities(entities):
         
 @app.post("/query")
 async def query(input: TextInput):
+    #print('INPUT text:',input.text)
     entities = extract_entities(input.text, input.parameters)
-    #print(input.text)
     return {"response": entities}
     
 

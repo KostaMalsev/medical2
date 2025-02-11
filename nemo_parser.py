@@ -155,6 +155,8 @@ def validate_documents(
     if(len(text) > 0):
         texts = read_text(text)
     else:
+        raise Exception('The text is empty')
+    
         logging.info(f"Reading texts from {input_file}")
         texts = read_file(input_file)    
     logging.info(f"Found {len(texts)} texts to process")

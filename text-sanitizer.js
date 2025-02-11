@@ -1,6 +1,8 @@
 // text-sanitizer.js
 const fs = require('fs');
 const path = require('path');
+const crypto = require('crypto');
+
 
 // Expanded medical terms and common words that should not be sanitized
 const PRESERVED_TERMS = new Set([
@@ -65,11 +67,18 @@ class TextSanitizer {
     }
 
     reset() {
+        this.uniqueId = this.generateUniqueId();
         this.idCounter = 1;
     }
 
+    
     generateUniqueId() {
-        return `ID_${String(this.idCounter++).padStart(6, '0')}`;
+        const hash = crypto.createHash('md5')
+            .update(Date.now().toString() + Math.random().toString())
+            .digest('hex');
+        
+        const numericId = parseInt(hash.slice(0, 6), 16) % 1000000;
+        return `ID_${String(numericId).padStart(6, '0')}`;
     }
 
     generateRedactedName() {
@@ -151,10 +160,9 @@ class TextSanitizer {
 
         // Replace IDs with unique IDs
         text = text.replace(this.patterns.ID_NUMBER, (match) => {
-            const uniqueId = this.generateUniqueId();
-            return `ת.ז.: ${uniqueId}`;
+            return `ת.ז.: ${this.uniqueId}`;
         });
-        text = text.replace(this.patterns.STANDALONE_ID, () => this.generateUniqueId());
+        text = text.replace(this.patterns.STANDALONE_ID, () => this.uniqueId);
 
         // Normalize spaces and split into words
         text = this.normalizeSpaces(text);

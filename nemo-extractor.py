@@ -25,7 +25,8 @@ params_df = pd.read_csv('transformed_parameters.csv')
 
 
 FIELD_PATTERNS = {
-    'patient_id': r'(?:ת\.?ז\.?:?\s*|מספר\s*תיק\s*רפואי:?\s*)(\d{9})',
+    #'patient_id': r'(?:ת\.?ז\.?:?\s*|מספר\s*תיק\s*רפואי:?\s*)(\d{9})',
+    'patient_id': '(ID_\\d{6})',
     'name': r'(?:שם:?\s*|ת\/המטופל:?\s*)([א-ת\s]+)',
     'admission_date': r'תאריך\s*קבלה:?\s*(\d{2}[./]\d{1,2}[./]\d{4})',
     'discharge_date': r'תאריך\s*שחרור:?\s*(\d{2}[./]\d{1,2}[./]\d{4})',
